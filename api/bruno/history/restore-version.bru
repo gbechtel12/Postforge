@@ -1,0 +1,29 @@
+meta {
+  name: Restore post to version 1
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/posts/{{postId}}/history/1/restore
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("post returned with updated version", function() {
+    expect(res.getBody()).to.have.property("version");
+  });
+
+  test("id still matches postId", function() {
+    expect(res.getBody().id).to.equal(bru.getEnvVar("postId"));
+  });
+}

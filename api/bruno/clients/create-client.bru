@@ -1,0 +1,72 @@
+meta {
+  name: Create client
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/clients
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Bech Creative",
+    "industry": "Marketing Agency",
+    "website": "https://bechcreative.com",
+    "brand_voice": "Professional but approachable. Speaks to small business owners. Avoids jargon. Always action-oriented.",
+    "prompt_template": "You are writing social media content for Bech Creative, a boutique web design and digital marketing agency based in western Pennsylvania. The audience is small to mid-size business owners. Tone is friendly, confident, and practical. Never use buzzwords like 'synergy' or 'leverage'. Always end with a clear call to action.",
+    "platform_defaults": {
+      "facebook": {
+        "tone": "conversational",
+        "hashtag_count": 5,
+        "include_cta": true
+      },
+      "instagram": {
+        "tone": "visual_storytelling",
+        "hashtag_count": 20,
+        "include_cta": true
+      },
+      "linkedin": {
+        "tone": "professional",
+        "hashtag_count": 3,
+        "include_cta": true
+      }
+    },
+    "primary_color": "#1A2B4A",
+    "secondary_color": "#F5A623"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setEnvVar("clientId", res.getBody().id);
+  }
+}
+
+tests {
+  test("status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("client id is returned", function() {
+    expect(res.getBody()).to.have.property("id");
+  });
+
+  test("name matches input", function() {
+    expect(res.getBody().name).to.equal("Bech Creative");
+  });
+
+  test("is_active defaults to true", function() {
+    expect(res.getBody().is_active).to.equal(true);
+  });
+
+  test("clientId stored in environment", function() {
+    expect(bru.getEnvVar("clientId")).to.not.be.empty;
+  });
+}

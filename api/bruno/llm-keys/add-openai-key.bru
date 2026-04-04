@@ -1,0 +1,41 @@
+meta {
+  name: Add OpenAI key
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/llm-keys
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "provider": "openai",
+    "api_key": "sk-test-replace-with-real-key"
+  }
+}
+
+tests {
+  test("status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("provider is openai", function() {
+    expect(res.getBody().provider).to.equal("openai");
+  });
+
+  test("raw key is not returned", function() {
+    expect(res.getBody()).to.not.have.property("api_key");
+    expect(res.getBody()).to.not.have.property("api_key_encrypted");
+  });
+
+  test("is_active is true", function() {
+    expect(res.getBody().is_active).to.equal(true);
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Get client by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/clients/{{clientId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("id matches requested clientId", function() {
+    expect(res.getBody().id).to.equal(bru.getEnvVar("clientId"));
+  });
+
+  test("has required fields", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("name");
+    expect(body).to.have.property("is_active");
+    expect(body).to.have.property("created_at");
+  });
+}

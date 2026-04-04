@@ -1,0 +1,49 @@
+meta {
+  name: Export posts as CSV
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/export
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "job_id": "{{jobId}}",
+    "format": "csv",
+    "include_images": true,
+    "status_filter": "all"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("batchId", res.getBody().id);
+  }
+}
+
+tests {
+  test("status is 200 (synchronous for csv)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("batch id returned", function() {
+    expect(res.getBody()).to.have.property("id");
+  });
+
+  test("format is csv", function() {
+    expect(res.getBody().format).to.equal("csv");
+  });
+
+  test("download_url present for csv", function() {
+    expect(res.getBody()).to.have.property("download_url");
+    expect(res.getBody().download_url).to.not.be.null;
+  });
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Soft-delete client
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/clients/{{clientId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

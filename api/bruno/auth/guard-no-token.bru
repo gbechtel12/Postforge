@@ -1,0 +1,21 @@
+meta {
+  name: 401 guard — missing token
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/clients
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 401 without token", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+
+  test("error field is present", function() {
+    expect(res.getBody()).to.have.property("error");
+  });
+}

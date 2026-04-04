@@ -1,0 +1,33 @@
+meta {
+  name: Get current user
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/auth/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response has user id", function() {
+    expect(res.getBody()).to.have.property("id");
+  });
+
+  test("response has plan_tier", function() {
+    expect(res.getBody()).to.have.property("plan_tier");
+  });
+
+  test("email is a string", function() {
+    expect(res.getBody().email).to.be.a("string");
+  });
+}

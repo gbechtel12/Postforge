@@ -1,0 +1,44 @@
+meta {
+  name: Export posts as ZIP (async)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/export
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "job_id": "{{jobId}}",
+    "format": "zip",
+    "include_images": true,
+    "status_filter": "all"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 202) {
+    bru.setEnvVar("batchId", res.getBody().id);
+  }
+}
+
+tests {
+  test("status is 202 Accepted (async for zip)", function() {
+    expect(res.getStatus()).to.equal(202);
+  });
+
+  test("batch id returned", function() {
+    expect(res.getBody()).to.have.property("id");
+  });
+
+  test("download_url is null until processing completes", function() {
+    expect(res.getBody().download_url).to.be.null;
+  });
+}

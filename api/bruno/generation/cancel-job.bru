@@ -1,0 +1,21 @@
+meta {
+  name: Cancel job
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/generate/{{jobId}}/cancel
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200 or 409", function() {
+    expect([200, 409]).to.include(res.getStatus());
+  });
+}

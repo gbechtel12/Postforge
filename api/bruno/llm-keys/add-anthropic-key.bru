@@ -1,0 +1,32 @@
+meta {
+  name: Add Anthropic key
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/llm-keys
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "provider": "anthropic",
+    "api_key": "sk-ant-test-replace-with-real-key"
+  }
+}
+
+tests {
+  test("status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("provider is anthropic", function() {
+    expect(res.getBody().provider).to.equal("anthropic");
+  });
+}

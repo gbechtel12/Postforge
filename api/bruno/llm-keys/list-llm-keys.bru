@@ -1,0 +1,33 @@
+meta {
+  name: List LLM keys
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/llm-keys
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("no raw api keys exposed", function() {
+    const keys = res.getBody();
+    keys.forEach(k => {
+      expect(k).to.not.have.property("api_key");
+      expect(k).to.not.have.property("api_key_encrypted");
+    });
+  });
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Delete key (openai)
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/llm-keys/openai
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

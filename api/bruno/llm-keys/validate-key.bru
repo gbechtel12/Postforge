@@ -1,0 +1,30 @@
+meta {
+  name: Validate key (openai)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/llm-keys/openai/validate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response has valid boolean", function() {
+    expect(res.getBody()).to.have.property("valid");
+    expect(res.getBody().valid).to.be.a("boolean");
+  });
+
+  test("provider echoed correctly", function() {
+    expect(res.getBody().provider).to.equal("openai");
+  });
+}

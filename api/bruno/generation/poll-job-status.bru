@@ -1,0 +1,41 @@
+meta {
+  name: Poll job status
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/generate/{{jobId}}/status
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("job_id matches environment", function() {
+    expect(res.getBody().job_id).to.equal(bru.getEnvVar("jobId"));
+  });
+
+  test("has posts_total and posts_complete", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("posts_total");
+    expect(body).to.have.property("posts_complete");
+  });
+
+  test("posts_complete does not exceed posts_total", function() {
+    const body = res.getBody();
+    expect(body.posts_complete).to.be.at.most(body.posts_total);
+  });
+
+  test("status is a valid enum value", function() {
+    const valid = ["pending", "processing", "complete", "error", "cancelled"];
+    expect(valid).to.include(res.getBody().status);
+  });
+}

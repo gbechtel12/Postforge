@@ -1,0 +1,39 @@
+meta {
+  name: Get post version history
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/posts/{{postId}}/history
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("all entries reference correct post_id", function() {
+    const entries = res.getBody();
+    entries.forEach(e => {
+      expect(e.post_id).to.equal(bru.getEnvVar("postId"));
+    });
+  });
+
+  test("versions are ordered ascending", function() {
+    const versions = res.getBody().map(e => e.version);
+    for (let i = 1; i < versions.length; i++) {
+      expect(versions[i]).to.be.at.least(versions[i - 1]);
+    }
+  });
+}

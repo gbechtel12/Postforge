@@ -1,0 +1,39 @@
+meta {
+  name: Regenerate caption
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/posts/{{postId}}/regenerate-caption
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "tone_hint": "make it punchier — lead with a question"
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("version incremented", function() {
+    expect(res.getBody().version).to.be.at.least(2);
+  });
+
+  test("caption is non-empty string", function() {
+    expect(res.getBody().caption).to.be.a("string").and.not.empty;
+  });
+
+  test("updated_at changed", function() {
+    expect(res.getBody()).to.have.property("updated_at");
+  });
+}

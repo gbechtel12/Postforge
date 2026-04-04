@@ -1,0 +1,1267 @@
+openapi: 3.1.0
+info:
+  title: PostForge API
+  description: |
+    PostForge — AI-powered social content and image generation platform.
+    
+    ## Authentication
+    All protected endpoints require a Bearer JWT token issued by Supabase Auth.
+    Include the token in the Authorization header: `Authorization: Bearer <token>`
+    
+    ## BYOK (Bring Your Own Keys)
+    PostForge never proxies LLM or image generation credits. Users supply their
+    own API keys via the `/llm-keys` endpoints. Keys are AES-256 encrypted at
+    rest and decrypted server-side only at generation time. Keys are never
+    returned in API responses — only metadata (provider, active status).
+    
+    ## Versioning
+    Current version: v1. Breaking changes will increment the version prefix.
+    
+    ## Rate Limiting
+    - Auth endpoints: 10 requests/minute per IP
+    - Generation endpoints: 5 concurrent jobs per user
+    - All other endpoints: 60 requests/minute per user
+    
+  version: 1.0.0
+  contact:
+    name: Bech Creative
+    url: https://bechcreative.com
+  license:
+    name: Proprietary
+    
+servers:
+  - url: https://api.postforge.app/v1
+    description: Production
+  - url: https://staging-api.postforge.app/v1
+    description: Staging
+  - url: http://localhost:54321/functions/v1
+    description: Local (Supabase Edge Functions)
+
+tags:
+  - name: Auth
+    description: Authentication via Supabase. Token management only — registration and login handled client-side via Supabase SDK.
+  - name: LLM Keys
+    description: Encrypted user-supplied API keys for LLM and image generation providers.
+  - name: Clients
+    description: Client/company profiles with branding, prompt templates, and platform defaults.
+  - name: Platforms
+    description: Read-only platform registry (Facebook, Instagram, LinkedIn, X, TikTok).
+  - name: Generation
+    description: Post and image generation jobs. Orchestrates LLM + image generation in a single async job.
+  - name: Posts
+    description: Individual generated posts. Supports copy, regenerate caption, regenerate image, and version history.
+  - name: Export
+    description: Export generated posts to CSV, JSON, or ZIP (images + captions).
+  - name: History
+    description: Version history for regenerated posts.
+
+paths:
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Returns the authenticated user's profile and plan tier.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh JWT token
+      description: Exchanges a valid refresh token for a new access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── LLM KEYS ────────────────────────────────────────────────────────────
+
+  /llm-keys:
+    get:
+      tags: [LLM Keys]
+      summary: List user's LLM key entries
+      description: Returns metadata only — api_key_encrypted is never returned.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of LLM key metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmKeyMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [LLM Keys]
+      summary: Add or update an LLM key
+      description: |
+        Stores an encrypted API key for the given provider. If a key for
+        that provider already exists, it is replaced. The raw key is never
+        stored — encryption happens server-side before persistence.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmKeyInput'
+      responses:
+        '201':
+          description: Key stored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmKeyMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /llm-keys/{provider}:
+    delete:
+      tags: [LLM Keys]
+      summary: Remove an LLM key by provider
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProviderParam'
+      responses:
+        '204':
+          description: Key removed
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /llm-keys/{provider}/validate:
+    post:
+      tags: [LLM Keys]
+      summary: Validate a stored key
+      description: Makes a minimal test call to the provider to confirm the key is active. Does not expose the key.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProviderParam'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  provider:
+                    type: string
+                  error:
+                    type: string
+                    nullable: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── CLIENTS ─────────────────────────────────────────────────────────────
+
+  /clients:
+    get:
+      tags: [Clients]
+      summary: List all clients for authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Client list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Clients]
+      summary: Create a new client
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientInput'
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /clients/{clientId}:
+    get:
+      tags: [Clients]
+      summary: Get a single client
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: Client record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Clients]
+      summary: Update client fields
+      description: Partial update — only supplied fields are changed.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientInput'
+      responses:
+        '200':
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Clients]
+      summary: Soft-delete a client
+      description: Sets is_active to false. Does not delete historical generation data.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '204':
+          description: Client deactivated
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /clients/{clientId}/logo:
+    post:
+      tags: [Clients]
+      summary: Upload client logo
+      description: |
+        Accepts multipart/form-data. Stores the logo in Supabase Storage
+        and updates client.logo_storage_path. Returns the public URL.
+        Max file size: 5MB. Accepted formats: PNG, JPG, SVG, WEBP.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [logo]
+              properties:
+                logo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Logo uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logo_url:
+                    type: string
+                    format: uri
+                  logo_storage_path:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── PLATFORMS ───────────────────────────────────────────────────────────
+
+  /platforms:
+    get:
+      tags: [Platforms]
+      summary: List all supported platforms
+      description: Seed data — not user-generated. Returns formatting rules and constraints per platform.
+      responses:
+        '200':
+          description: Platform list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Platform'
+
+  /platforms/{platformSlug}:
+    get:
+      tags: [Platforms]
+      summary: Get a single platform by slug
+      parameters:
+        - name: platformSlug
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [facebook, instagram, linkedin, x, tiktok]
+      responses:
+        '200':
+          description: Platform record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Platform'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── GENERATION ──────────────────────────────────────────────────────────
+
+  /generate:
+    post:
+      tags: [Generation]
+      summary: Start a generation job
+      description: |
+        Creates a generation job and begins async processing. The job
+        generates captions and image prompts via the user's chosen LLM,
+        then fires image generation requests in parallel.
+        
+        Poll `/generate/{jobId}/status` or subscribe to the Supabase
+        realtime channel `generation_jobs:{jobId}` for progress updates.
+        
+        Requires an active LLM key for the specified provider.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerationJobInput'
+      responses:
+        '202':
+          description: Job accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: No active LLM key for the requested provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /generate/{jobId}/status:
+    get:
+      tags: [Generation]
+      summary: Poll job status
+      description: Returns the current job status and count of completed posts.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/JobIdParam'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /generate/{jobId}/cancel:
+    post:
+      tags: [Generation]
+      summary: Cancel a pending or in-progress job
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/JobIdParam'
+      responses:
+        '200':
+          description: Job cancelled
+        '409':
+          description: Job already completed or cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── POSTS ───────────────────────────────────────────────────────────────
+
+  /posts:
+    get:
+      tags: [Posts]
+      summary: List generated posts
+      description: Supports filtering by client, platform, job, and status.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: platform_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [generated, approved, exported, archived]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated post list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /posts/{postId}:
+    get:
+      tags: [Posts]
+      summary: Get a single post
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PostIdParam'
+      responses:
+        '200':
+          description: Post record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedPost'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Posts]
+      summary: Update post notes or status
+      description: For user edits to the caption or status changes (approve, archive). Does not trigger regeneration — use /regenerate for that.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PostIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_notes:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  enum: [generated, approved, exported, archived]
+                caption:
+                  type: string
+                  description: Manual caption override — does not snapshot to history
+      responses:
+        '200':
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedPost'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /posts/{postId}/regenerate-caption:
+    post:
+      tags: [Posts]
+      summary: Regenerate caption only
+      description: |
+        Snapshots current post to post_history, then calls the LLM to
+        rewrite the caption. Increments version. Image is preserved.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PostIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tone_hint:
+                  type: string
+                  description: Optional override hint passed to the LLM (e.g. "make it more conversational")
+      responses:
+        '200':
+          description: Post with updated caption
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedPost'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '402':
+          description: No active LLM key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /posts/{postId}/regenerate-image:
+    post:
+      tags: [Posts]
+      summary: Regenerate image only
+      description: |
+        Generates a new image prompt via the LLM, then fires a new image
+        generation request. Snapshots current state to history first.
+        Caption is preserved.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PostIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image_prompt_override:
+                  type: string
+                  description: If provided, uses this prompt directly instead of asking the LLM to generate one
+      responses:
+        '200':
+          description: Post with updated image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedPost'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '402':
+          description: No active image generation key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── HISTORY ─────────────────────────────────────────────────────────────
+
+  /posts/{postId}/history:
+    get:
+      tags: [History]
+      summary: Get version history for a post
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PostIdParam'
+      responses:
+        '200':
+          description: Ordered list of historical versions (oldest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostHistoryEntry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /posts/{postId}/history/{version}/restore:
+    post:
+      tags: [History]
+      summary: Restore a post to a previous version
+      description: Snapshots current state before restoring. Increments version number.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PostIdParam'
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Post restored to specified version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedPost'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── EXPORT ──────────────────────────────────────────────────────────────
+
+  /export:
+    post:
+      tags: [Export]
+      summary: Export posts from a job
+      description: |
+        Generates an export file from a completed generation job.
+        
+        - `csv`: One row per post with caption, image_url, platform, day_number, image_prompt
+        - `json`: Full post objects array
+        - `zip`: Captions as text files + downloaded images, structured by day
+        
+        Async for ZIP (returns job reference). Synchronous for CSV/JSON.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportInput'
+      responses:
+        '200':
+          description: CSV or JSON export (synchronous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportBatch'
+            text/csv:
+              schema:
+                type: string
+        '202':
+          description: ZIP export accepted — poll export_batches for download URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportBatch'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /export/{batchId}/download:
+    get:
+      tags: [Export]
+      summary: Get a signed download URL for an export
+      description: Returns a time-limited signed URL (15 minutes) for the export file in Supabase Storage.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Signed download URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  download_url:
+                    type: string
+                    format: uri
+                  expires_at:
+                    type: string
+                    format: date-time
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ─── COMPONENTS ──────────────────────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase-issued JWT. Obtain via Supabase Auth SDK on the client.
+
+  parameters:
+    ClientIdParam:
+      name: clientId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    PostIdParam:
+      name: postId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    JobIdParam:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ProviderParam:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [openai, anthropic, gemini, ideogram, stabilityai]
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found or not owned by authenticated user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+  schemas:
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          example: not_found
+        message:
+          type: string
+          example: Client not found or access denied
+
+    ValidationError:
+      type: object
+      required: [error, message, details]
+      properties:
+        error:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: Request body failed validation
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          nullable: true
+        plan_tier:
+          type: string
+          enum: [free, pro, agency]
+        created_at:
+          type: string
+          format: date-time
+
+    LlmKeyMeta:
+      type: object
+      description: API key metadata — raw key is never returned
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [openai, anthropic, gemini, ideogram, stabilityai]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    LlmKeyInput:
+      type: object
+      required: [provider, api_key]
+      properties:
+        provider:
+          type: string
+          enum: [openai, anthropic, gemini, ideogram, stabilityai]
+        api_key:
+          type: string
+          description: Raw API key — transmitted over HTTPS, encrypted server-side before storage
+          example: sk-...
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Bech Creative
+        industry:
+          type: string
+          nullable: true
+          example: Marketing Agency
+        website:
+          type: string
+          format: uri
+          nullable: true
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Public Supabase Storage URL for the logo
+        brand_voice:
+          type: string
+          nullable: true
+          description: Free-text description of brand personality and tone
+        prompt_template:
+          type: string
+          nullable: true
+          description: LLM system prompt scaffold for this client
+        platform_defaults:
+          type: object
+          nullable: true
+          description: Per-platform config overrides (hashtag count, CTA style, tone dials)
+          example:
+            facebook:
+              tone: conversational
+              hashtag_count: 5
+              include_cta: true
+            linkedin:
+              tone: professional
+              hashtag_count: 3
+              include_cta: true
+        primary_color:
+          type: string
+          nullable: true
+          example: "#1A73E8"
+        secondary_color:
+          type: string
+          nullable: true
+          example: "#F5A623"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ClientInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        industry:
+          type: string
+          nullable: true
+        website:
+          type: string
+          format: uri
+          nullable: true
+        brand_voice:
+          type: string
+          nullable: true
+        prompt_template:
+          type: string
+          nullable: true
+        platform_defaults:
+          type: object
+          nullable: true
+        primary_color:
+          type: string
+          nullable: true
+        secondary_color:
+          type: string
+          nullable: true
+
+    Platform:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          enum: [facebook, instagram, linkedin, x, tiktok]
+        display_name:
+          type: string
+          example: Instagram
+        max_caption_chars:
+          type: integer
+          example: 2200
+        aspect_ratio:
+          type: string
+          example: "1:1"
+        formatting_rules:
+          type: object
+          description: Platform-specific formatting constraints and recommendations
+          example:
+            hashtag_position: bottom
+            max_hashtags: 30
+            line_break_before_cta: true
+            emoji_friendly: true
+
+    GenerationJobInput:
+      type: object
+      required: [client_id, platform_id, days_requested, llm_provider]
+      properties:
+        client_id:
+          type: string
+          format: uuid
+        platform_id:
+          type: string
+          format: uuid
+        days_requested:
+          type: integer
+          minimum: 1
+          maximum: 30
+          example: 7
+        llm_provider:
+          type: string
+          enum: [openai, anthropic, gemini]
+          description: LLM provider for caption and image prompt generation
+        image_provider:
+          type: string
+          enum: [openai, ideogram, stabilityai]
+          nullable: true
+          description: If null, image prompts are generated but images are not. User generates images manually.
+        tone_overrides:
+          type: object
+          nullable: true
+          description: One-time tone dials for this job (overrides client platform_defaults)
+          example:
+            formality: casual
+            promotional_ratio: 0.3
+
+    GenerationJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        platform_id:
+          type: string
+          format: uuid
+        days_requested:
+          type: integer
+        llm_provider:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, complete, error, cancelled]
+        job_config:
+          type: object
+          description: Snapshot of the full config used at job creation time
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    GenerationJobStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, complete, error, cancelled]
+        posts_total:
+          type: integer
+        posts_complete:
+          type: integer
+        posts_errored:
+          type: integer
+        error_message:
+          type: string
+          nullable: true
+
+    GeneratedPost:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        platform_id:
+          type: string
+          format: uuid
+        day_number:
+          type: integer
+          example: 3
+        caption:
+          type: string
+        image_prompt:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        image_storage_path:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [generated, approved, exported, archived]
+        user_notes:
+          type: string
+          nullable: true
+        version:
+          type: integer
+          description: Increments on each regeneration
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PostListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeneratedPost'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    PostHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        post_id:
+          type: string
+          format: uuid
+        caption:
+          type: string
+        image_prompt:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ExportInput:
+      type: object
+      required: [job_id, format]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        format:
+          type: string
+          enum: [csv, json, zip]
+        include_images:
+          type: boolean
+          default: true
+          description: ZIP only — whether to download and bundle images
+        status_filter:
+          type: string
+          enum: [all, approved]
+          default: all
+          description: Export all posts or only approved ones
+
+    ExportBatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        format:
+          type: string
+        storage_path:
+          type: string
+          nullable: true
+        download_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Present for CSV/JSON (synchronous). Null for ZIP until processing completes.
+        created_at:
+          type: string
+          format: date-time

@@ -1,0 +1,58 @@
+meta {
+  name: Start generation job
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/generate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "client_id": "{{clientId}}",
+    "platform_id": "{{platformId}}",
+    "days_requested": 7,
+    "llm_provider": "anthropic",
+    "image_provider": null,
+    "tone_overrides": {
+      "formality": "casual",
+      "promotional_ratio": 0.3
+    }
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 202) {
+    bru.setEnvVar("jobId", res.getBody().id);
+  }
+}
+
+tests {
+  test("status is 202 Accepted", function() {
+    expect(res.getStatus()).to.equal(202);
+  });
+
+  test("job id returned", function() {
+    expect(res.getBody()).to.have.property("id");
+  });
+
+  test("status is pending or processing", function() {
+    const status = res.getBody().status;
+    expect(["pending", "processing"]).to.include(status);
+  });
+
+  test("days_requested matches input", function() {
+    expect(res.getBody().days_requested).to.equal(7);
+  });
+
+  test("jobId stored in environment", function() {
+    expect(bru.getEnvVar("jobId")).to.not.be.empty;
+  });
+}

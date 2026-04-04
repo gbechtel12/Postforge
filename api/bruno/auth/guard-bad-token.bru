@@ -1,0 +1,21 @@
+meta {
+  name: 401 guard — malformed token
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/clients
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: not.a.real.jwt.token
+}
+
+tests {
+  test("status is 401 with bad token", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}

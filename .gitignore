@@ -1,0 +1,59 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+build/
+.output/
+.vercel/
+.netlify/
+
+# ── Environment & secrets ──────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+!.env.example
+
+# ── Supabase ──────────────────────────────────────────────────────────────────
+.supabase/
+supabase/.temp/
+
+# ── Editor & OS ───────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/extensions.json
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Test output ───────────────────────────────────────────────────────────────
+coverage/
+test-results/
+junit.xml
+results.xml
+
+# ── TypeScript ────────────────────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── Bruno — never commit secret values ────────────────────────────────────────
+# The .bru files themselves ARE committed (they contain structure, not secrets)
+# bruno.env files with filled-in secrets should NOT be committed
+api/bruno/environments/*.env.local
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.zip
+*.tar.gz

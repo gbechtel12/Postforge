@@ -1,0 +1,50 @@
+meta {
+  name: List posts (by job)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/posts?job_id={{jobId}}&limit=20&offset=0
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    const data = res.getBody().data;
+    if (data && data.length > 0) {
+      bru.setEnvVar("postId", data[0].id);
+    }
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response has data array and pagination", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("data");
+    expect(body).to.have.property("total");
+    expect(body).to.have.property("limit");
+    expect(body).to.have.property("offset");
+    expect(body.data).to.be.an("array");
+  });
+
+  test("posts belong to requested job", function() {
+    const posts = res.getBody().data;
+    posts.forEach(p => {
+      expect(p.job_id).to.equal(bru.getEnvVar("jobId"));
+    });
+  });
+
+  test("postId stored in environment", function() {
+    expect(bru.getEnvVar("postId")).to.not.be.empty;
+  });
+}

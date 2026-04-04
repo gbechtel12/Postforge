@@ -1,0 +1,44 @@
+meta {
+  name: List all platforms
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/platforms
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response is an array", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+
+  test("expected platforms present", function() {
+    const slugs = res.getBody().map(p => p.slug);
+    expect(slugs).to.include("facebook");
+    expect(slugs).to.include("instagram");
+    expect(slugs).to.include("linkedin");
+    expect(slugs).to.include("x");
+  });
+
+  test("each platform has formatting_rules", function() {
+    res.getBody().forEach(p => {
+      expect(p).to.have.property("formatting_rules");
+      expect(p).to.have.property("max_caption_chars");
+    });
+  });
+
+  script:post-response {
+    const platforms = res.getBody();
+    const instagram = platforms.find(p => p.slug === "instagram");
+    if (instagram) {
+      bru.setEnvVar("platformId", instagram.id);
+    }
+  }
+}

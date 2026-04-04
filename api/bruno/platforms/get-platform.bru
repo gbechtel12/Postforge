@@ -1,0 +1,29 @@
+meta {
+  name: Get platform by slug (instagram)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/platforms/instagram
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("slug is instagram", function() {
+    expect(res.getBody().slug).to.equal("instagram");
+  });
+
+  test("has aspect ratio", function() {
+    expect(res.getBody()).to.have.property("aspect_ratio");
+  });
+
+  test("404 guard — bad slug", function() {
+    // This is a doc note only — test the 404 in get-platform-404.bru
+  });
+}

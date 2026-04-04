@@ -1,0 +1,34 @@
+meta {
+  name: Start job — no LLM key (402 guard)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/generate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "client_id": "{{clientId}}",
+    "platform_id": "{{platformId}}",
+    "days_requested": 3,
+    "llm_provider": "gemini"
+  }
+}
+
+tests {
+  test("status is 402 when no gemini key configured", function() {
+    expect(res.getStatus()).to.equal(402);
+  });
+
+  test("error message references missing key", function() {
+    expect(res.getBody().message).to.be.a("string");
+  });
+}

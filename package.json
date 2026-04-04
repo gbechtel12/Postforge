@@ -1,0 +1,34 @@
+{
+  "name": "postforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered social content and image generation platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "preview": "pnpm --filter web preview",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:push": "supabase db push",
+    "functions:serve": "supabase functions serve",
+    "api:test:local": "bru run api/bruno --env local --recursive",
+    "api:test:staging": "bru run api/bruno --env staging --recursive",
+    "api:docs:serve": "npx @scalar/cli serve api/spec/openapi.yaml"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

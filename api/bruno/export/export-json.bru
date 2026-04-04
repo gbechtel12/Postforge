@@ -1,0 +1,33 @@
+meta {
+  name: Export posts as JSON
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/export
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "job_id": "{{jobId}}",
+    "format": "json",
+    "status_filter": "approved"
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("format is json", function() {
+    expect(res.getBody().format).to.equal("json");
+  });
+}

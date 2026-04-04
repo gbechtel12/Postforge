@@ -1,0 +1,31 @@
+meta {
+  name: Regenerate image (manual prompt)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/posts/{{postId}}/regenerate-image
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "image_prompt_override": "Flat-lay of a modern laptop and coffee mug on a clean white desk, soft natural light, brand color accent #1A2B4A, minimal and professional"
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("image_prompt matches override", function() {
+    expect(res.getBody().image_prompt).to.include("Flat-lay");
+  });
+}

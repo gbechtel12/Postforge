@@ -1,0 +1,42 @@
+meta {
+  name: Update client (partial)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/clients/{{clientId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "brand_voice": "Updated brand voice — warmer and more community-focused.",
+    "platform_defaults": {
+      "facebook": {
+        "tone": "community",
+        "hashtag_count": 8,
+        "include_cta": true
+      }
+    }
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("brand_voice was updated", function() {
+    expect(res.getBody().brand_voice).to.include("warmer");
+  });
+
+  test("updated_at changed", function() {
+    expect(res.getBody()).to.have.property("updated_at");
+  });
+}

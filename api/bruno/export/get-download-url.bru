@@ -1,0 +1,32 @@
+meta {
+  name: Get signed download URL
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/export/{{batchId}}/download
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("download_url is a valid URI", function() {
+    const url = res.getBody().download_url;
+    expect(url).to.be.a("string");
+    expect(url).to.match(/^https?:\/\//);
+  });
+
+  test("expires_at is in the future", function() {
+    const expiresAt = new Date(res.getBody().expires_at);
+    expect(expiresAt.getTime()).to.be.greaterThan(Date.now());
+  });
+}

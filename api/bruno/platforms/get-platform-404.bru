@@ -1,0 +1,21 @@
+meta {
+  name: Get platform 404 (bad slug)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/platforms/snapchat
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 404", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+
+  test("error field present", function() {
+    expect(res.getBody()).to.have.property("error");
+  });
+}

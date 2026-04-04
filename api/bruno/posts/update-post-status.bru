@@ -1,0 +1,36 @@
+meta {
+  name: Approve post
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/posts/{{postId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "status": "approved",
+    "user_notes": "Approved after minor review — good hook, solid CTA."
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("status updated to approved", function() {
+    expect(res.getBody().status).to.equal("approved");
+  });
+
+  test("user_notes persisted", function() {
+    expect(res.getBody().user_notes).to.include("Approved");
+  });
+}
