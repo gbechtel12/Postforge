@@ -1,5 +1,6 @@
 import { corsHeaders } from '../_shared/cors.ts'
 import { requireAuth } from '../_shared/auth.ts'
+import { pathSegments } from '../_shared/path.ts'
 import { ok, created, noContent, badRequest, notFound, serverError } from '../_shared/response.ts'
 
 Deno.serve(async (req: Request) => {
@@ -11,7 +12,7 @@ Deno.serve(async (req: Request) => {
   try {
     const { supabase, userId } = await requireAuth(req)
     const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
+    const pathParts = pathSegments(req)
     // pathParts: ['clients'] or ['clients', ':id'] or ['clients', ':id', 'logo']
     const clientId = pathParts[1] ?? null
     const subResource = pathParts[2] ?? null

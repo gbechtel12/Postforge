@@ -16,6 +16,21 @@ export type PostStatus = 'generated' | 'approved' | 'exported' | 'archived'
 
 export type ExportFormat = 'csv' | 'json' | 'zip'
 
+/** One-time tone dials for a generation job (see GenerationJobInput.tone_overrides). */
+export type ToneFormality = 'casual' | 'balanced' | 'formal'
+
+export interface ToneOverrides {
+  formality: ToneFormality
+  promotional_ratio: number
+}
+
+export interface PostListResponse {
+  data: GeneratedPost[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export interface User {
   id: string
   email: string
@@ -31,6 +46,23 @@ export interface LlmKeyMeta {
   created_at: string
 }
 
+export interface LlmKeyValidateResult {
+  valid: boolean
+  provider?: string
+  error?: string | null
+}
+
+/** Per-platform overrides stored on `clients.platform_defaults` (see OpenAPI Client schema). */
+export interface PlatformDefaultEntry {
+  tone: string
+  hashtag_count: number
+  include_cta: boolean
+}
+
+export type PlatformDefaults = Partial<
+  Record<PlatformSlug, PlatformDefaultEntry>
+>
+
 export interface Client {
   id: string
   user_id: string
@@ -38,9 +70,11 @@ export interface Client {
   industry: string | null
   website: string | null
   logo_url: string | null
+  /** Present when the API returns raw storage metadata (e.g. edge function `select('*')`). */
+  logo_storage_path?: string | null
   brand_voice: string | null
   prompt_template: string | null
-  platform_defaults: Record<string, unknown> | null
+  platform_defaults: PlatformDefaults | Record<string, unknown> | null
   primary_color: string | null
   secondary_color: string | null
   is_active: boolean
